@@ -4,7 +4,7 @@ import {
   CW, CH, OPT_COLS, OPT_LBLS, WIN_COLS,
   drawBackground, drawLiveBadge, drawTextQuestion,
   drawMCQQuestion, drawImageQuestion, drawWinners,
-  drawParticles, spawnParticles, drawFooter,
+  drawParticles, spawnParticles, drawFooter, drawLeaderboard
 } from '../lib/canvasRenderer';
 import { useYouTubeChat } from '../lib/useYouTubeChat';
 
@@ -230,7 +230,7 @@ export default function QuizStream() {
         correctIdx: liveCorrectIdx,
         correctAnswer: liveEffectiveAnswer,
         imageObj: liveImageObj,
-        revealAnswer: liveRevealAnswer,
+        liveRevealAnswer,
         isLive,
         timer,
         winners,
@@ -243,7 +243,7 @@ export default function QuizStream() {
         correctIdx,
         correctAnswer: effectiveAnswer,
         imageObj,
-        revealAnswer,
+        liveRevealAnswer,
         isLive,
         timer,
         winners,
@@ -259,6 +259,18 @@ export default function QuizStream() {
     const ctx = canvas.getContext('2d');
     let rafId;
 
+    // Aggregate leaderboard data (top 3)
+    function getLeaderboard(winners) {
+      const pointsMap = {};
+      winners.forEach(w => {
+        pointsMap[w.username] = (pointsMap[w.username] || 0) + w.points;
+      });
+      return Object.entries(pointsMap)
+        .map(([username, points]) => ({ username, points }))
+        .sort((a, b) => b.points - a.points)
+        .slice(0, 3);
+    }
+
     const loop = (ts) => {
       rafId = requestAnimationFrame(loop);
       const st = stateRef.current;
@@ -269,6 +281,9 @@ export default function QuizStream() {
       if (st.qType === 'text') drawTextQuestion(ctx, st);
       else if (st.qType === 'mcq') drawMCQQuestion(ctx, st);
       else drawImageQuestion(ctx, st);
+
+      // Draw leaderboard inside canvas
+      drawLeaderboard(ctx, getLeaderboard(allWinnersRef.current));
 
       const alive = drawWinners(ctx, st.winners);
       // prune expired winners
@@ -328,10 +343,7 @@ export default function QuizStream() {
     const isCorrect = isLive && checkAnswer(text) && !seenUsers.current.has(user);
     if (isCorrect) {
       seenUsers.current.add(user);
-      const answerLabel = qType === 'mcq'
-        ? `${OPT_LBLS[correctIdx]}: ${options[correctIdx]}`
-        : text;
-      const w = { id, username: user, answer: text, answerLabel, points: Math.floor(Math.random() * 50 + 50), addedAt: Date.now() };
+      const w = { id, username: user, points: 10, addedAt: Date.now() };
       setWinners(prev => [...prev, w]);
       setAllWinners(prev => [...prev, w]);
       spawnParticles(particlesRef.current);
@@ -365,7 +377,7 @@ export default function QuizStream() {
     seenUsers.current.clear();
     setIsLive(true);
     setTimer(timerInput);
-
+    startTimer(timerInput);
     // Copy builder state to live state
     setLiveQType(qType);
     setLiveQuestionText(questionText);
@@ -399,7 +411,7 @@ export default function QuizStream() {
     stopQuiz();
     seenUsers.current.clear();
     setComments([]);
-    setRevealAnswer(false);
+    setLiveRevealAnswer(false);
   };
 
   // ── Streaming ───────────────────────────────────────────────────────────
@@ -507,8 +519,8 @@ export default function QuizStream() {
             {/* YouTube Config */}
             <div style={S.panel}>
               <div style={S.pt('#FF6B6B')}>◆ YOUTUBE STREAM</div>
-              <label style={S.lbl}>STREAM URL</label>
-              <input value={streamUrl} onChange={e => setStreamUrl(e.target.value)} style={{ ...S.inp, resize: 'none' }} />
+              <label style={{display:"none"}}>STREAM URL</label>
+              <input style={{display:"none"}} value={streamUrl} onChange={e => setStreamUrl(e.target.value)} />
               <div style={{ display: 'flex', gap: 7, marginTop: 9 }}>
                 <button onClick={startStream} disabled={streaming} style={S.btn('#059669', { flex: 1, opacity: streaming ? 0.4 : 1 })}>▶ START STREAM</button>
                 <button onClick={stopStream} disabled={!streaming} style={S.btn('#DC2626', { flex: 1, opacity: !streaming ? 0.4 : 1 })}>■ STOP</button>
@@ -577,8 +589,8 @@ export default function QuizStream() {
                 <button onClick={goLive} style={S.btn('#059669')}>▶ GO LIVE</button>
                 {/* Reveal works for ALL question types */}
                 {isLive && (
-                  <button onClick={revealAns} disabled={revealAnswer} style={S.btn('#f59e0b', { opacity: revealAnswer ? 0.45 : 1 })}>
-                    {revealAnswer ? '✓ Revealed' : '👁 Reveal Ans'}
+                  <button onClick={revealAns} disabled={liveRevealAnswer} style={S.btn('#f59e0b', { opacity: liveRevealAnswer ? 0.45 : 1 })}>
+                    {liveRevealAnswer ? '✓ Revealed' : '👁 Reveal Ans'}
                   </button>
                 )}
                 <button onClick={stopQuiz} style={S.btn('#DC2626')}>■ Stop</button>
@@ -693,7 +705,7 @@ export default function QuizStream() {
           </div>
 
           {/* ── Right: Canvas Preview ── */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#030308', minWidth: 0 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#030308', minWidth: 0, position: 'relative' }}>
             <div style={{ background: '#0a0a1a', borderBottom: '1px solid #1e1e3a', padding: '6px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <span style={{ color: '#555', fontSize: 11 }}>📺 1080 × 1920 · 9:16 portrait · 30fps → YouTube RTMP</span>
               <span style={{ color: '#4ECDC4', fontSize: 10, background: '#13131f', border: '1px solid #2a2a4a', borderRadius: 4, padding: '2px 9px' }}>9:16</span>
