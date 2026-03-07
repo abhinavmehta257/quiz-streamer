@@ -5,6 +5,8 @@
 export default async function handler(req, res) {
   const { videoId } = req.query;
   const apiKey = process.env.YOUTUBE_APIKEY; // Allow env var override for security
+  console.log(apiKey);
+  
   if (!videoId || !apiKey) {
     return res.status(400).json({ error: 'Missing videoId or apiKey' });
   }
@@ -30,6 +32,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ liveChatId });
   } catch (err) {
+    console.log(err);
+    
     return res.status(500).json({ error: 'Network error: ' + err.message });
   }
 }

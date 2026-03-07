@@ -4,9 +4,9 @@
  * Returns messages + nextPageToken + pollingIntervalMillis (from YouTube).
  */
 export default async function handler(req, res) {
-  const { liveChatId, apiKey, pageToken } = req.query;
-
-  if (!liveChatId || !apiKey) {
+  const { liveChatId, pageToken } = req.query;
+  const apiKey = process.env.YOUTUBE_APIKEY; // Allow env var override for security
+  if (!liveChatId) {
     return res.status(400).json({ error: 'Missing liveChatId or apiKey' });
   }
 
