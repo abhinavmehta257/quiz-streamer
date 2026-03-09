@@ -436,7 +436,13 @@ export default function QuizStream() {
 
       mrRef.current = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
 
-      const wsUrl = `ws://${window.location.hostname}?streamUrl=${encodeURIComponent(streamUrl)}`;
+      console.log(`ws://${window.location.hostname == 'localhost' ? window.location.hostname+':3000' : window.location.hostname}/ws-stream?streamUrl=${encodeURIComponent(streamUrl)}`);
+      
+      const isLocal = window.location.hostname === 'localhost';
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsHost = isLocal ? `${window.location.hostname}:3000` : window.location.hostname;
+
+      const wsUrl = `${wsProtocol}://${wsHost}/ws-stream?streamUrl=${encodeURIComponent(streamUrl)}`;
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
