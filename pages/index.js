@@ -436,7 +436,7 @@ export default function QuizStream() {
 
       mrRef.current = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
 
-      const wsUrl = `ws://localhost:3000/ws-stream?streamUrl=${encodeURIComponent(streamUrl)}`;
+      const wsUrl = `ws://${window.location.hostname}?streamUrl=${encodeURIComponent(streamUrl)}`;
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
