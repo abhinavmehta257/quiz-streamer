@@ -339,6 +339,8 @@ export default function QuizStream() {
 
   // ── Add comment ─────────────────────────────────────────────────────────
   const addComment = useCallback((user, text) => {
+    console.log(user,text);
+    
     const id = Date.now() + Math.random();
     const isCorrect = isLive && checkAnswer(text) && !seenUsers.current.has(user);
     if (isCorrect) {
