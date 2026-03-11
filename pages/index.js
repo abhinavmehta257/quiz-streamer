@@ -166,27 +166,31 @@ export default function QuizStream() {
   const [imageObj, setImageObj] = useState(null);
 
   // Live question state (used during quiz)
+  const [isLive, setIsLive] = useState(false);
   const [liveQType, setLiveQType] = useState(null);
   const [liveQuestionText, setLiveQuestionText] = useState('');
-  const [liveOptions, setLiveOptions] = useState([]);
+  const [liveOptions, setLiveOptions] = useState(['', '', '', '']);
   const [liveCorrectIdx, setLiveCorrectIdx] = useState(null);
   const [liveCorrectAnswer, setLiveCorrectAnswer] = useState('');
   const [liveImageUrl, setLiveImageUrl] = useState('');
   const [liveImageObj, setLiveImageObj] = useState(null);
   const [liveRevealAnswer, setLiveRevealAnswer] = useState(false);
 
-  // Quiz state
-  const [isLive, setIsLive] = useState(false);
-  const [timer, setTimer] = useState(0);
-  const [timerInput, setTimerInput] = useState(360);
+  // Audience state
+  const [comments, setComments] = useState([]);
   const [winners, setWinners] = useState([]);
   const [allWinners, setAllWinners] = useState([]);
-  const [comments, setComments] = useState([]);
 
-  // Stream state
+  // Backend stream state
+  const [streamState, setStreamState] = useState(null);
+  const [stateError, setStateError] = useState('');
+  const [timer, setTimer] = useState(0);
+  const [timerInput, setTimerInput] = useState(360);
+
+  // Stream config / UI state
   const [streamUrl, setStreamUrl] = useState('rtmp://a.rtmp.youtube.com/live2');
-  const [streaming, setStreaming] = useState(false);
   const [streamMsg, setStreamMsg] = useState(null);
+  const [streaming, setStreaming] = useState(false);
   const [streamStats, setStreamStats] = useState('');
 
   // Sim state
@@ -204,8 +208,8 @@ export default function QuizStream() {
   const particlesRef = useRef([]);
   const timerRef = useRef(null);
   const seenUsers = useRef(new Set());
-  const wsRef = useRef(null);
   const mrRef = useRef(null);
+  const wsRef = useRef(null);
   const audioCtxRef = useRef(null);
 
   // Derived correct answer string for builder
@@ -357,7 +361,7 @@ export default function QuizStream() {
   const { connected: ytConnected, msgCount: ytMsgCount } = useYouTubeChat({
     videoId: ytVideoId,
     apiKey: ytApiKey,
-    enabled: ytEnabled,
+    enabled: false,
     onMessage: (author, text) => addComment(author, text),
     onError: (msg) => { setYtError(msg); setYtEnabled(false); },
     onStatus: (s) => setYtStatus(s),
@@ -379,7 +383,9 @@ export default function QuizStream() {
     seenUsers.current.clear();
     setIsLive(true);
     setTimer(timerInput);
-    startTimer(timerInput);
+    if(timerInput > 0){
+      startTimer(timerInput);
+    }
     // Copy builder state to live state
     setLiveQType(qType);
     setLiveQuestionText(questionText);
@@ -442,28 +448,41 @@ export default function QuizStream() {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
       const wsHost = isLocal ? `${window.location.hostname}:3000` : window.location.hostname;
 
-      const wsUrl = `${wsProtocol}://${wsHost}/ws-stream?streamUrl=${encodeURIComponent(streamUrl)}`;
-      wsRef.current = new WebSocket(wsUrl);
+      // const wsUrl = `${wsProtocol}://${wsHost}/ws-stream?streamUrl=${encodeURIComponent(streamUrl)}`;
+      // wsRef.current = new WebSocket(wsUrl);
 
-      wsRef.current.onopen = () => {
-        mrRef.current.start(200);
-        setStreaming(true);
-        setStreamMsg({ text: '✅ Streaming live to YouTube…', color: '#34d399' });
-      };
-      wsRef.current.onmessage = (e) => {
-        try {
-          const m = JSON.parse(e.data);
-          if (m.type === 'error') setStreamMsg({ text: '❌ ' + m.message, color: '#FF6B6B' });
-          if (m.type === 'stats' && m.fps) setStreamStats(m.fps + 'fps · ' + m.bitrate);
-        } catch {}
-      };
-      wsRef.current.onerror = () => setStreamMsg({ text: '❌ Cannot connect — run npm run dev in the project folder', color: '#FF6B6B' });
-      wsRef.current.onclose = () => { setStreaming(false); setStreamStats(''); };
+      fetch('/api/stream/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ streamUrl, questionState:
+          stateRef.current
+         }),
+      }).then(res => res.json()).then(data => {
+        if (data.error) setStreamMsg({ text: '❌ ' + data.error, color: '#FF6B6B' });
+        else setStreamMsg({ text: '✅ Streaming live to YouTube…', color: '#34d399' });
+      }).catch(err => {
+        setStreamMsg({ text: '❌ ' + err.message, color: '#FF6B6B' });
+      });
 
-      mrRef.current.ondataavailable = (e) => {
-        if (e.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN)
-          wsRef.current.send(e.data);
-      };
+      // wsRef.current.onopen = () => {
+      //   mrRef.current.start(200);
+      //   setStreaming(true);
+      //   setStreamMsg({ text: '✅ Streaming live to YouTube…', color: '#34d399' });
+      // };
+      // wsRef.current.onmessage = (e) => {
+      //   try {
+      //     const m = JSON.parse(e.data);
+      //     if (m.type === 'error') setStreamMsg({ text: '❌ ' + m.message, color: '#FF6B6B' });
+      //     if (m.type === 'stats' && m.fps) setStreamStats(m.fps + 'fps · ' + m.bitrate);
+      //   } catch {}
+      // };
+      // wsRef.current.onerror = () => setStreamMsg({ text: '❌ Cannot connect — run npm run dev in the project folder', color: '#FF6B6B' });
+      // wsRef.current.onclose = () => { setStreaming(false); setStreamStats(''); };
+
+      // mrRef.current.ondataavailable = (e) => {
+      //   if (e.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN)
+      //     wsRef.current.send(e.data);
+      // };
     } catch (err) {
       setStreamMsg({ text: '❌ ' + err.message, color: '#FF6B6B' });
     }

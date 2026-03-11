@@ -1,4 +1,4 @@
-export function formatTime(totalSeconds) {
+function formatTime(totalSeconds) {
   totalSeconds = Math.floor(totalSeconds);
 
   const hrs = Math.floor(totalSeconds / 3600);
@@ -15,3 +15,7 @@ export function formatTime(totalSeconds) {
 
   return `${secs}s`;
 }
+
+module.exports = {
+  formatTime,
+};
