@@ -6,7 +6,7 @@ import {
   drawMCQQuestion, drawImageQuestion, drawWinners,
   drawParticles, spawnParticles, drawFooter, drawLeaderboard
 } from '../lib/canvasRenderer';
-import { useYouTubeChat } from '../lib/useYouTubeChat';
+// import { useYouTubeChat } from '../lib/useYouTubeChat';
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
 const S = {
@@ -158,10 +158,10 @@ function HallOfFame({ allWinners }) {
 export default function QuizStream() {
   // Question builder state (editable)
   const [qType, setQType] = useState('mcq');
-  const [questionText, setQuestionText] = useState('Which planet is known as the Red Planet?');
-  const [options, setOptions] = useState(['Venus', 'Mars', 'Jupiter', 'Saturn']);
+  const [questionText, setQuestionText] = useState('');
+  const [options, setOptions] = useState([]);
   const [correctIdx, setCorrectIdx] = useState(1);
-  const [correctAnswer, setCorrectAnswer] = useState('Mars');
+  const [correctAnswer, setCorrectAnswer] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [imageObj, setImageObj] = useState(null);
 
@@ -203,6 +203,8 @@ export default function QuizStream() {
   const [ytEnabled, setYtEnabled] = useState(false);
   const [ytStatus, setYtStatus] = useState('');
   const [ytError, setYtError] = useState('');
+  const [ytConnected, setYtConnected] = useState(false);
+  const [ytMsgCount, setYtMsgCount] = useState(0);
 
   const canvasRef = useRef(null);
   const particlesRef = useRef([]);
@@ -233,8 +235,17 @@ export default function QuizStream() {
         options: liveOptions,
         correctIdx: liveCorrectIdx,
         correctAnswer: liveEffectiveAnswer,
+        // Flag used by renderer (frontend + backend) to show the answer banner
+        revealAnswer: liveRevealAnswer,
+        // Local image object for browser canvas
         imageObj: liveImageObj,
-        liveRevealAnswer,
+        // Serializable image payload for backend renderer
+        image: {
+          url: liveImageUrl && !liveImageUrl.startsWith('data:') ? liveImageUrl : '',
+          dataUrl: liveImageUrl && liveImageUrl.startsWith('data:') ? liveImageUrl : '',
+          width: liveImageObj?.width || 0,
+          height: liveImageObj?.height || 0,
+        },
         isLive,
         timer,
         winners,
@@ -246,8 +257,15 @@ export default function QuizStream() {
         options,
         correctIdx,
         correctAnswer: effectiveAnswer,
+        // Mirror flag so preview & backend can read a unified "revealAnswer"
+        revealAnswer: liveRevealAnswer,
         imageObj,
-        liveRevealAnswer,
+        image: {
+          url: imageUrl && !imageUrl.startsWith('data:') ? imageUrl : '',
+          dataUrl: imageUrl && imageUrl.startsWith('data:') ? imageUrl : '',
+          width: imageObj?.width || 0,
+          height: imageObj?.height || 0,
+        },
         isLive,
         timer,
         winners,
@@ -357,15 +375,9 @@ export default function QuizStream() {
     setComments(prev => [...prev.slice(-60), { id, user, text, isCorrect }]);
   }, [isLive, checkAnswer, qType, correctIdx, options]);
 
-  // ── YouTube Live Chat Hook ──────────────────────────────────────────────
-  const { connected: ytConnected, msgCount: ytMsgCount } = useYouTubeChat({
-    videoId: ytVideoId,
-    apiKey: ytApiKey,
-    enabled: false,
-    onMessage: (author, text) => addComment(author, text),
-    onError: (msg) => { setYtError(msg); setYtEnabled(false); },
-    onStatus: (s) => setYtStatus(s),
-  });
+  // ── YouTube Live Chat (backend-driven) ───────────────────────────────────
+  // Frontend now only sends the videoId to the backend; the server polls
+  // YouTube chat and updates winners/leaderboard via streamState.
 
   // ── Timer ───────────────────────────────────────────────────────────────
   const startTimer = (secs) => {
@@ -640,7 +652,7 @@ export default function QuizStream() {
                 {ytConnected && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: '#34d399', fontWeight: 700 }}>
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block', boxShadow: '0 0 6px #34d399' }} />
-                    LIVE · {ytMsgCount} msgs
+                    LIVE · server chat polling
                   </span>
                 )}
               </div>
@@ -676,14 +688,50 @@ export default function QuizStream() {
 
               <div style={{ display: 'flex', gap: 7, marginTop: 9 }}>
                 <button
-                  onClick={() => { setYtError(''); setYtStatus(''); setYtEnabled(true); }}
+                  onClick={async () => {
+                    setYtError('');
+                    setYtStatus('Connecting…');
+                    try {
+                      const res = await fetch('/api/stream/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ videoId: ytVideoId, enabled: true }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok || data.error) {
+                        throw new Error(data.error || 'Failed to start chat polling');
+                      }
+                      setYtEnabled(true);
+                      setYtConnected(true);
+                      setYtStatus('Server chat polling started');
+                    } catch (err) {
+                      setYtEnabled(false);
+                      setYtConnected(false);
+                      setYtStatus('');
+                      setYtError(err.message);
+                    }
+                  }}
                   disabled={ytEnabled || !ytVideoId}
                   style={S.btn('#FF0000', { flex: 1, opacity: (ytEnabled || !ytVideoId) ? 0.4 : 1 })}
                 >
                   ▶ CONNECT CHAT
                 </button>
                 <button
-                  onClick={() => setYtEnabled(false)}
+                  onClick={async () => {
+                    setYtStatus('Stopping…');
+                    try {
+                      await fetch('/api/stream/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enabled: false }),
+                      });
+                    } catch (err) {
+                      console.warn('Failed to stop server chat polling', err);
+                    }
+                    setYtEnabled(false);
+                    setYtConnected(false);
+                    setYtStatus('Chat polling stopped');
+                  }}
                   disabled={!ytEnabled}
                   style={S.btn('#374151', { opacity: !ytEnabled ? 0.4 : 1 })}
                 >
@@ -734,7 +782,7 @@ export default function QuizStream() {
           {/* ── Right: Canvas Preview ── */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#030308', minWidth: 0, position: 'relative' }}>
             <div style={{ background: '#0a0a1a', borderBottom: '1px solid #1e1e3a', padding: '6px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <span style={{ color: '#555', fontSize: 11 }}>📺 1080 × 1920 · 9:16 portrait · 30fps → YouTube RTMP</span>
+              <span style={{ color: '#555', fontSize: 11 }}>📺 720 × 1080 · 9:16 portrait · 30fps → YouTube RTMP</span>
               <span style={{ color: '#4ECDC4', fontSize: 10, background: '#13131f', border: '1px solid #2a2a4a', borderRadius: 4, padding: '2px 9px' }}>9:16</span>
             </div>
             <div ref={wrapRef} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, overflow: 'hidden' }}>

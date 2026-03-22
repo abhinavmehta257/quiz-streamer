@@ -15,7 +15,7 @@ app.prepare().then(() => {
 ╔══════════════════════════════════════════════╗
 ║   ⚡  Quiz Stream (Next.js)                   ║
 ║   Open:  http://localhost:${PORT}                ║
-║   Canvas: 1080 × 1920  (9:16 portrait)        ║
+║   Canvas: 720 × 1080   (vertical portrait)     ║
 ║   Node renderer + FFmpeg relay ready          ║
 ╚══════════════════════════════════════════════╝
     `);

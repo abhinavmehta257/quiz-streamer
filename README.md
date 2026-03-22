@@ -1,7 +1,7 @@
 # ⚡ Quiz Stream — Next.js Edition
 
 YouTube Live streaming quiz overlay.  
-**9:16 Portrait · 1080×1920 · H.264 → RTMP → YouTube**
+**Vertical Stream · 720×1080 · H.264 → RTMP → YouTube**
 
 ---
 
@@ -50,7 +50,7 @@ npm run dev
 
 | Setting       | Value        |
 |--------------|--------------|
-| Canvas       | 1080 × 1920  |
+| Canvas       | 720 × 1080   |
 | Aspect Ratio | 9:16 portrait |
 | Frame Rate   | 30 fps       |
 | Video        | H.264 via FFmpeg |
@@ -63,7 +63,7 @@ npm run dev
 ## Architecture
 
 ```
-React Canvas (1080×1920, 30fps)
+React Canvas (720×1080, 30fps)
   ↓ canvas.captureStream()
 MediaRecorder → WebM chunks
   ↓ WebSocket /ws-stream
