@@ -185,7 +185,7 @@ export default function QuizStream() {
   const [streamState, setStreamState] = useState(null);
   const [stateError, setStateError] = useState('');
   const [timer, setTimer] = useState(0);
-  const [timerInput, setTimerInput] = useState(360);
+  const [timerInput, setTimerInput] = useState(0);
 
   // Stream config / UI state
   const [streamUrl, setStreamUrl] = useState('rtmp://a.rtmp.youtube.com/live2');
