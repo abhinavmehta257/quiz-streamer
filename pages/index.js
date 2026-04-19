@@ -185,7 +185,7 @@ export default function QuizStream() {
   const [streamState, setStreamState] = useState(null);
   const [stateError, setStateError] = useState('');
   const [timer, setTimer] = useState(0);
-  const [timerInput, setTimerInput] = useState(360);
+  const [timerInput, setTimerInput] = useState(0);
 
   // Stream config / UI state
   const [streamUrl, setStreamUrl] = useState('rtmp://a.rtmp.youtube.com/live2');
@@ -407,6 +407,22 @@ export default function QuizStream() {
     setLiveImageUrl(imageUrl);
     setLiveImageObj(imageObj);
     setLiveRevealAnswer(false);
+    UpdateStreamState({
+      qType,
+      questionText,
+      options: [...options],
+      correctIdx,
+      correctAnswer,
+      imageUrl,
+      image: {
+        url: imageUrl && !imageUrl.startsWith('data:') ? imageUrl : '',
+        dataUrl: imageUrl && imageUrl.startsWith('data:') ? imageUrl : '',
+        width: imageObj?.width || 0,
+        height: imageObj?.height || 0,
+      },
+      isLive: true,
+      timer: timerInput,
+    });
   };
 
   const stopQuiz = () => {
@@ -507,6 +523,18 @@ export default function QuizStream() {
     setStreaming(false);
     setStreamStats('');
     setStreamMsg({ text: 'Stream stopped.', color: '#666' });
+  };
+
+  const UpdateStreamState = (patch) => {
+    fetch('/api/stream/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).then(res => res.json()).then(data => {
+      if (data.error) console.error('Failed to update stream state:', data.error);
+    }).catch(err => {
+      console.error('Failed to update stream state:', err);
+    });
   };
 
   // ── Quick fire sim ──────────────────────────────────────────────────────
